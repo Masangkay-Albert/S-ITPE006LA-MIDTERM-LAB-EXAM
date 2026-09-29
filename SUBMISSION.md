@@ -198,8 +198,8 @@ The AI-generated architecture is realistic and achievable for a 3-hour team prot
 
 ---
 
-## Task 2: 3NF Relational Database Architecture & DDL Implementation (30 Mins | 25 Points)
-**Lead:** Member 2 / Systems Architect
+## Task 3: 3NF Relational Database Architecture & DDL Implementation (30 Mins | 25 Points)
+**Lead:** Member 3 - (Umandal, Alen)
 
 ### 1. 3NF Schema Design & Normalization Justification
 *Refer to full documentation in [`database/SCHEMA_DESIGN.md`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/database/SCHEMA_DESIGN.md) and Prisma schema in [`backend/prisma/schema.prisma`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/backend/prisma/schema.prisma).*
