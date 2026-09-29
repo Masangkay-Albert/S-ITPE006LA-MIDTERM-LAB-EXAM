@@ -1,0 +1,108 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:../../database/dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Role {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  users     User[]
+
+  @@map("roles")
+}
+
+model Department {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  users     User[]
+
+  @@map("departments")
+}
+
+model User {
+  id              Int            @id @default(autoincrement())
+  roleId          Int            @map("role_id")
+  role            Role           @relation(fields: [roleId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  departmentId    Int?           @map("department_id")
+  department      Department?    @relation(fields: [departmentId], references: [id], onUpdate: Cascade, onDelete: SetNull)
+  studentId       String?        @unique @map("student_id")
+  firstName       String         @map("first_name")
+  lastName        String         @map("last_name")
+  email           String         @unique
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at")
+  organizedEvents Event[]        @relation("OrganizedEvents")
+  registrations   Registration[]
+
+  @@index([roleId], map: "idx_users_role_id")
+  @@index([departmentId], map: "idx_users_department_id")
+  @@map("users")
+}
+
+model EventCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  events      Event[]
+
+  @@map("event_categories")
+}
+
+model Venue {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  building  String
+  capacity  Int
+  createdAt DateTime @default(now()) @map("created_at")
+  events    Event[]
+
+  @@map("venues")
+}
+
+model Event {
+  id            Int            @id @default(autoincrement())
+  title         String
+  description   String?
+  categoryId    Int            @map("category_id")
+  category      EventCategory  @relation(fields: [categoryId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  venueId       Int            @map("venue_id")
+  venue         Venue          @relation(fields: [venueId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  organizerId   Int            @map("organizer_id")
+  organizer     User           @relation("OrganizedEvents", fields: [organizerId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  capacity      Int
+  startAt       DateTime       @map("start_at")
+  endAt         DateTime       @map("end_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at")
+  registrations Registration[]
+
+  @@index([categoryId], map: "idx_events_category_id")
+  @@index([venueId], map: "idx_events_venue_id")
+  @@index([organizerId], map: "idx_events_organizer_id")
+  @@index([startAt], map: "idx_events_start_at")
+  @@map("events")
+}
+
+model Registration {
+  id           Int      @id @default(autoincrement())
+  eventId      Int      @map("event_id")
+  event        Event    @relation(fields: [eventId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  userId       Int      @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  status       String   @default("CONFIRMED")
+  registeredAt DateTime @default(now()) @map("registered_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([userId, eventId], map: "uq_registrations_user_event")
+  @@index([eventId], map: "idx_registrations_event_id")
+  @@index([userId], map: "idx_registrations_user_id")
+  @@map("registrations")
+}

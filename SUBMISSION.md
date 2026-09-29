@@ -194,3 +194,110 @@ AppLayout (Navbar with Role Toggle: Student | Admin, Campus Logo)
 ### 3. Manual Grounding Evaluation
 
 The AI-generated architecture is realistic and achievable for a 3-hour team prototype because it selects a unified full-stack framework (Next.js with Tailwind CSS and SQLite/Prisma) that eliminates multi-repository setup, port conflicts, and external database installation delays. By strictly enforcing the negative constraints—disallowing third-party state managers like Redux and external authentication services—it prevents the team from falling into boilerplate traps and keeps state handling within lightweight native React hooks. The modular 3-way work breakdown cleanly decouples data models, student-facing UI, and admin API endpoints, ensuring all three team members can develop concurrently without blocking one another. Furthermore, utilizing a file-based SQLite database with pre-seeded mock campus events ensures the system can be demonstrated with realistic data immediately upon launch.
+
+
+---
+
+## Task 2: 3NF Relational Database Architecture & DDL Implementation (30 Mins | 25 Points)
+**Lead:** Member 2 / Systems Architect
+
+### 1. 3NF Schema Design & Normalization Justification
+*Refer to full documentation in [`database/SCHEMA_DESIGN.md`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/database/SCHEMA_DESIGN.md) and Prisma schema in [`backend/prisma/schema.prisma`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/backend/prisma/schema.prisma).*
+
+#### Entities & Keys
+- **`roles`**: `id` (PK), `name` (UK)
+- **`departments`**: `id` (PK), `code` (UK), `name` (UK)
+- **`users`**: `id` (PK), `role_id` (FK), `department_id` (FK), `student_id` (UK), `email` (UK)
+- **`event_categories`**: `id` (PK), `name` (UK)
+- **`venues`**: `id` (PK), `name` (UK), `capacity` (CHECK > 0)
+- **`events`**: `id` (PK), `category_id` (FK), `venue_id` (FK), `organizer_id` (FK), `capacity` (CHECK > 0), `start_at`, `end_at` (CHECK `end_at > start_at`)
+- **`registrations`**: `id` (PK), `event_id` (FK), `user_id` (FK), `status` (CHECK), `UNIQUE(user_id, event_id)`
+
+#### Transitive Dependency Elimination
+- Redundant student profiles (name, email, department) live strictly in `users`, not duplicated in `registrations`.
+- Venue properties (building, venue capacity) and category metadata live in `venues` and `event_categories`, not duplicated in `events`.
+- Academic affiliations live in `departments`, referenced by `users.department_id`.
+
+---
+
+### 2. Entity-Relationship Diagram (Mermaid.js)
+
+```mermaid
+erDiagram
+    ROLES ||--o{ USERS : "assigned to"
+    DEPARTMENTS |o--o{ USERS : "belongs to"
+    EVENT_CATEGORIES ||--o{ EVENTS : "categorizes"
+    VENUES ||--o{ EVENTS : "hosts"
+    USERS ||--o{ EVENTS : "organizes"
+    USERS ||--o{ REGISTRATIONS : "places"
+    EVENTS ||--o{ REGISTRATIONS : "receives"
+
+    ROLES {
+        INTEGER id PK
+        TEXT name UK
+        TEXT created_at
+    }
+
+    DEPARTMENTS {
+        INTEGER id PK
+        TEXT code UK
+        TEXT name UK
+        TEXT created_at
+    }
+
+    USERS {
+        INTEGER id PK
+        INTEGER role_id FK
+        INTEGER department_id FK
+        TEXT student_id UK
+        TEXT first_name
+        TEXT last_name
+        TEXT email UK
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    EVENT_CATEGORIES {
+        INTEGER id PK
+        TEXT name UK
+        TEXT description
+        TEXT created_at
+    }
+
+    VENUES {
+        INTEGER id PK
+        TEXT name UK
+        TEXT building
+        INTEGER capacity
+        TEXT created_at
+    }
+
+    EVENTS {
+        INTEGER id PK
+        TEXT title
+        TEXT description
+        INTEGER category_id FK
+        INTEGER venue_id FK
+        INTEGER organizer_id FK
+        INTEGER capacity
+        TEXT start_at
+        TEXT end_at
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    REGISTRATIONS {
+        INTEGER id PK
+        INTEGER event_id FK
+        INTEGER user_id FK
+        TEXT status
+        TEXT registered_at
+        TEXT updated_at
+    }
+```
+
+---
+
+### 3. Production SQL DDL & Seed Script
+The executable SQL script is located at [`database/schema.sql`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/database/schema.sql).
+

@@ -1,0 +1,71 @@
+erDiagram
+    ROLES ||--o{ USERS : "assigned to"
+    DEPARTMENTS |o--o{ USERS : "belongs to"
+    EVENT_CATEGORIES ||--o{ EVENTS : "categorizes"
+    VENUES ||--o{ EVENTS : "hosts"
+    USERS ||--o{ EVENTS : "organizes"
+    USERS ||--o{ REGISTRATIONS : "places"
+    EVENTS ||--o{ REGISTRATIONS : "receives"
+
+    ROLES {
+        INTEGER id PK
+        TEXT name UK
+        TEXT created_at
+    }
+
+    DEPARTMENTS {
+        INTEGER id PK
+        TEXT code UK
+        TEXT name UK
+        TEXT created_at
+    }
+
+    USERS {
+        INTEGER id PK
+        INTEGER role_id FK
+        INTEGER department_id FK
+        TEXT student_id UK
+        TEXT first_name
+        TEXT last_name
+        TEXT email UK
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    EVENT_CATEGORIES {
+        INTEGER id PK
+        TEXT name UK
+        TEXT description
+        TEXT created_at
+    }
+
+    VENUES {
+        INTEGER id PK
+        TEXT name UK
+        TEXT building
+        INTEGER capacity
+        TEXT created_at
+    }
+
+    EVENTS {
+        INTEGER id PK
+        TEXT title
+        TEXT description
+        INTEGER category_id FK
+        INTEGER venue_id FK
+        INTEGER organizer_id FK
+        INTEGER capacity
+        TEXT start_at
+        TEXT end_at
+        TEXT created_at
+        TEXT updated_at
+    }
+
+    REGISTRATIONS {
+        INTEGER id PK
+        INTEGER event_id FK
+        INTEGER user_id FK
+        TEXT status
+        TEXT registered_at
+        TEXT updated_at
+    }
