@@ -1,7 +1,7 @@
 # Database Architecture & 3NF Schema Specification
 
 ## Online Campus Event Management System
-**Lead:** Member 3 (Umandal, Alen)
+
 ---
 
 ## 1. Schema Design and 3NF Justification

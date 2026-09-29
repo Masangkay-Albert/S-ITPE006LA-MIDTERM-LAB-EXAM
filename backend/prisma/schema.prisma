@@ -1,6 +1,6 @@
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = "file:../../database/dev.db"
 }
 
 generator client {
@@ -27,19 +27,19 @@ model Department {
 }
 
 model User {
-  id            Int            @id @default(autoincrement())
-  roleId        Int            @map("role_id")
-  role          Role           @relation(fields: [roleId], references: [id], onUpdate: Cascade, onDelete: Restrict)
-  departmentId  Int?           @map("department_id")
-  department    Department?    @relation(fields: [departmentId], references: [id], onUpdate: Cascade, onDelete: SetNull)
-  studentId     String?        @unique @map("student_id")
-  firstName     String         @map("first_name")
-  lastName      String         @map("last_name")
-  email         String         @unique
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at")
-  organizedEvents Event[]      @relation("OrganizedEvents")
-  registrations Registration[]
+  id              Int            @id @default(autoincrement())
+  roleId          Int            @map("role_id")
+  role            Role           @relation(fields: [roleId], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  departmentId    Int?           @map("department_id")
+  department      Department?    @relation(fields: [departmentId], references: [id], onUpdate: Cascade, onDelete: SetNull)
+  studentId       String?        @unique @map("student_id")
+  firstName       String         @map("first_name")
+  lastName        String         @map("last_name")
+  email           String         @unique
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at")
+  organizedEvents Event[]        @relation("OrganizedEvents")
+  registrations   Registration[]
 
   @@index([roleId], map: "idx_users_role_id")
   @@index([departmentId], map: "idx_users_department_id")

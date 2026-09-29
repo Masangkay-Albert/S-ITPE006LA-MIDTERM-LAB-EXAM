@@ -202,7 +202,7 @@ The AI-generated architecture is realistic and achievable for a 3-hour team prot
 **Lead:** Member 2 / Systems Architect
 
 ### 1. 3NF Schema Design & Normalization Justification
-*Refer to full documentation in [`SCHEMA_DESIGN.md`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/SCHEMA_DESIGN.md) and Prisma schema in [`prisma/schema.prisma`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/prisma/schema.prisma).*
+*Refer to full documentation in [`database/SCHEMA_DESIGN.md`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/database/SCHEMA_DESIGN.md) and Prisma schema in [`backend/prisma/schema.prisma`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/backend/prisma/schema.prisma).*
 
 #### Entities & Keys
 - **`roles`**: `id` (PK), `name` (UK)
@@ -299,4 +299,5 @@ erDiagram
 ---
 
 ### 3. Production SQL DDL & Seed Script
-The executable SQL script is located at [`schema.sql`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/schema.sql).
+The executable SQL script is located at [`database/schema.sql`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/database/schema.sql).
+
