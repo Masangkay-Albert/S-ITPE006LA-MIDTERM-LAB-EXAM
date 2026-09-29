@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Campus Event Management System student portal for browsing campus events and registering online."
+    />
+    <title>Campus Event Management System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./css/base.css" />
+    <link rel="stylesheet" href="./css/layout.css" />
+    <link rel="stylesheet" href="./css/components.css" />
+    <link rel="stylesheet" href="./css/forms.css" />
+    <link rel="stylesheet" href="./css/accessibility.css" />
+    <link rel="stylesheet" href="./css/responsive.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container nav-wrap">
+        <div class="brand" aria-label="City University home">
+          <div class="brand-mark" aria-hidden="true">CU</div>
+          <div class="brand-copy">
+            <span class="brand-name">City University</span>
+            <small>Campus Event Management System</small>
+          </div>
+        </div>
+
+        <nav aria-label="Primary navigation">
+          <ul class="main-nav">
+            <li><a href="#catalog" class="active">Events</a></li>
+            <li><a href="#calendar">Calendar</a></li>
+            <li><a href="#resources">Resources</a></li>
+          </ul>
+        </nav>
+
+        <div class="profile-pill" aria-label="Student portal profile">
+          <span class="avatar" aria-hidden="true">AS</span>
+          <span>Student Portal</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero container" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Student affairs</p>
+          <h1 id="page-title">Upcoming Campus Events</h1>
+          <p class="lead">
+            Browse upcoming campus activities, discover leadership and learning opportunities,
+            and register for the events that match your interests.
+          </p>
+        </div>
+
+        <aside class="hero-panel" aria-label="Campus event overview">
+          <p class="panel-label">This week</p>
+          <strong id="liveSummary">0 upcoming events</strong>
+          <span id="liveAvailability">Seats available across campus.</span>
+        </aside>
+      </section>
+
+      <section id="filtersContainer" class="filters container" aria-labelledby="filters-heading"></section>
+
+      <section class="catalog container" aria-labelledby="catalog-heading">
+        <div class="catalog-header">
+          <h2 id="catalog-heading">Event catalog</h2>
+          <p id="resultCount" aria-live="polite">Showing all events</p>
+        </div>
+
+        <div id="eventGrid" class="event-grid" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-wrap">
+        <p>City University Student Affairs</p>
+        <p>Campus Event Management System</p>
+      </div>
+    </footer>
+
+    <div id="eventModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-overlay" data-close-modal></div>
+      <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <button type="button" class="close-button" aria-label="Close event modal" data-close-modal>
+          ×
+        </button>
+        <div id="modalContent"></div>
+      </div>
+    </div>
+
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>
