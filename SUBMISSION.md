@@ -1,7 +1,18 @@
 # Midterm Lab Exam: Online Campus Event Management System
 
+**Course & Section:** S-ITPE006LA &mdash; BIT44  
+**Date:** September 30, 2026  
+
+| Student Name | Assigned Task |
+| :--- | :--- |
+| **Masangkay, John Albert** | Task 2 (Frontend Engineer) |
+| **Ramos, Lenard Kristan** | Task 1 & Task 5 (Systems Architect & Prompt Lead) |
+| **Umandal, Alen** | Task 3 & Task 4 (Database & Backend Engineer) |
+
+---
+
 ## Task 1: Requirements Analysis & Prompt Architecture (30 Mins | 20 Points)
-**Lead:** Member 1 (Ramos, Lenard)
+**Lead:** Member 1 (Ramos, Lenard Kristan)
 
 ---
 
@@ -180,7 +191,8 @@ AppLayout (Navbar with Role Toggle: Student | Admin, Campus Logo)
 
 ##### 6. 3-Hour Team Implementation Breakdown
 
-| Timeline | 
+| Timeline | Member 1 (Systems Architect) | Member 2 (Frontend Lead) | Member 3 (Backend & Integration Lead) |
+| :--- | :--- | :--- | :--- |
 | **00:00 – 00:30** *(30m)* | Initialize Next.js project, Tailwind CSS, Prisma SQLite setup, define schemas, and write database seed script with 3 sample events. | Scaffold UI layout, navigation bar with mock role toggle, and design base responsive container. | Setup API Route skeleton (`/api/events`, `/api/registrations`), and configure database connection utility. |
 | **00:30 – 01:30** *(60m)* | Implement database queries, capacity validation helper, and duplicate registration protection logic. | Build `EventCard`, `EventGrid`, filter components, and mock modal for student registration. | Implement `/api/registrations` POST handler with input validation and `/api/admin/attendees` GET handler. |
 | **01:30 – 02:30** *(60m)* | Build Admin Dashboard view (`AttendeeRosterTable`, `CapacityMetricsBar`) and hook up to attendee API. | Connect `RegistrationModal` to POST API with loading states, error toast/alerts, and success confirmation. | Conduct end-to-end integration tests (student registration -> database update -> admin view instant reflection). |
@@ -193,7 +205,6 @@ AppLayout (Navbar with Role Toggle: Student | Admin, Campus Logo)
 ### 3. Manual Grounding Evaluation
 
 The AI-generated architecture is realistic and achievable for a 3-hour team prototype because it selects a unified full-stack framework (Next.js with Tailwind CSS and SQLite/Prisma) that eliminates multi-repository setup, port conflicts, and external database installation delays. By strictly enforcing the negative constraints—disallowing third-party state managers like Redux and external authentication services—it prevents the team from falling into boilerplate traps and keeps state handling within lightweight native React hooks. The modular 3-way work breakdown cleanly decouples data models, student-facing UI, and admin API endpoints, ensuring all three team members can develop concurrently without blocking one another. Furthermore, utilizing a file-based SQLite database with pre-seeded mock campus events ensures the system can be demonstrated with realistic data immediately upon launch.
-
 
 ---
 
@@ -414,7 +425,7 @@ public record EventCapacityDto(int EventId, int MaxCapacity, int ConfirmedRegist
 public class RegistrationValidationService
 {
     private readonly IEventRepository _eventRepository;
-    private static readonly string[] AllowedDomains = { "@univ.edu.ph", "@dlsud.edu.ph" };
+    private static readonly string[] AllowedDomains = { "@univ.edu.ph", "@dlsud.edu.ph", "@campus.edu", "@cityu.edu" };
 
     public RegistrationValidationService(IEventRepository eventRepository)
     {
@@ -431,7 +442,6 @@ public class RegistrationValidationService
 
         email = email.Trim().ToLowerInvariant();
 
-        // Must contain single '@' and not start with '@'
         int atIndex = email.IndexOf('@');
         if (atIndex <= 0 || atIndex != email.LastIndexOf('@'))
             return false;
@@ -485,10 +495,7 @@ public class RegistrationValidationServiceTests
     [InlineData("cs_dept@dlsud.edu.ph")]
     public void IsValidUniversityEmail_WithValidUniversityDomain_ReturnsTrue(string validEmail)
     {
-        // Act
         bool result = _service.IsValidUniversityEmail(validEmail);
-
-        // Assert
         Assert.True(result);
     }
 
@@ -504,10 +511,7 @@ public class RegistrationValidationServiceTests
     [InlineData(null)]                        // Null reference
     public void IsValidUniversityEmail_WithInvalidOrUnauthorizedDomain_ReturnsFalse(string? invalidEmail)
     {
-        // Act
         bool result = _service.IsValidUniversityEmail(invalidEmail);
-
-        // Assert
         Assert.False(result);
     }
 
@@ -518,15 +522,12 @@ public class RegistrationValidationServiceTests
     [Fact]
     public async Task IsSeatAvailableAsync_WhenSeatsRemaining_ReturnsTrue()
     {
-        // Arrange (Mock: 35 confirmed out of 50 max capacity)
         int eventId = 101;
         _mockRepo.Setup(r => r.GetEventCapacityAsync(eventId))
                  .ReturnsAsync(new EventCapacityDto(eventId, MaxCapacity: 50, ConfirmedRegistrations: 35));
 
-        // Act
         bool isAvailable = await _service.IsSeatAvailableAsync(eventId);
 
-        // Assert
         Assert.True(isAvailable);
         _mockRepo.Verify(r => r.GetEventCapacityAsync(eventId), Times.Once);
     }
@@ -534,15 +535,12 @@ public class RegistrationValidationServiceTests
     [Fact]
     public async Task IsSeatAvailableAsync_WhenEventAtExactCapacity_ReturnsFalse()
     {
-        // Arrange (Boundary test: 50 confirmed out of 50 max capacity)
         int eventId = 102;
         _mockRepo.Setup(r => r.GetEventCapacityAsync(eventId))
                  .ReturnsAsync(new EventCapacityDto(eventId, MaxCapacity: 50, ConfirmedRegistrations: 50));
 
-        // Act
         bool isAvailable = await _service.IsSeatAvailableAsync(eventId);
 
-        // Assert
         Assert.False(isAvailable);
         _mockRepo.Verify(r => r.GetEventCapacityAsync(eventId), Times.Once);
     }
@@ -550,15 +548,12 @@ public class RegistrationValidationServiceTests
     [Fact]
     public async Task IsSeatAvailableAsync_WhenEventOverbooked_ReturnsFalse()
     {
-        // Arrange (Edge test: 52 confirmed out of 50 capacity)
         int eventId = 103;
         _mockRepo.Setup(r => r.GetEventCapacityAsync(eventId))
                  .ReturnsAsync(new EventCapacityDto(eventId, MaxCapacity: 50, ConfirmedRegistrations: 52));
 
-        // Act
         bool isAvailable = await _service.IsSeatAvailableAsync(eventId);
 
-        // Assert
         Assert.False(isAvailable);
         _mockRepo.Verify(r => r.GetEventCapacityAsync(eventId), Times.Once);
     }
@@ -566,12 +561,10 @@ public class RegistrationValidationServiceTests
     [Fact]
     public async Task IsSeatAvailableAsync_WhenEventDoesNotExist_ThrowsKeyNotFoundException()
     {
-        // Arrange (Mock returns null for missing event)
         int missingEventId = 999;
         _mockRepo.Setup(r => r.GetEventCapacityAsync(missingEventId))
                  .ReturnsAsync((EventCapacityDto?)null);
 
-        // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.IsSeatAvailableAsync(missingEventId));
         _mockRepo.Verify(r => r.GetEventCapacityAsync(missingEventId), Times.Once);
     }
@@ -579,10 +572,7 @@ public class RegistrationValidationServiceTests
     [Fact]
     public async Task IsSeatAvailableAsync_WithInvalidId_ThrowsArgumentOutOfRangeException()
     {
-        // Act & Assert
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => _service.IsSeatAvailableAsync(-1));
-        
-        // Assert: External repository should never be touched on invalid parameter
         _mockRepo.Verify(r => r.GetEventCapacityAsync(It.IsAny<int>()), Times.Never);
     }
 
@@ -628,55 +618,70 @@ public string GetUserRegistration(string inputEmail)
 
 ---
 
-#### B. Refactored Secure Implementation
+#### B. Refactored Secure Implementation ([`backend/RegistrationService.cs`](./backend/RegistrationService.cs))
 
 ```csharp
 using System;
 using System.Data;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
+using System.Text.RegularExpressions;
 
-public class RegistrationRepository
+namespace CampusEventManagement.Backend
 {
-    private readonly string _connectionString;
-
-    // Inject configuration to avoid hardcoded credentials
-    public RegistrationRepository(IConfiguration configuration)
+    public interface IRegistrationService
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection") 
-            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not configured.");
+        bool ValidateStudentEmail(string email, string requiredDomain = "@univ.edu.ph");
+        bool VerifySeatAvailability(int currentRegisteredCount, int maxCapacity);
+        string GetUserRegistration(string inputEmail);
     }
 
-    /// <summary>
-    /// Safely retrieves registration status by email using parameterized queries
-    /// and deterministic unmanaged resource disposal.
-    /// </summary>
-    /// <param name="inputEmail">Student institutional email address.</param>
-    /// <returns>Registration status or null if not found.</returns>
-    public string? GetUserRegistration(string? inputEmail)
+    public class RegistrationService : IRegistrationService
     {
-        // 1. Guard clause: Reject null, empty, or oversized input
-        if (string.IsNullOrWhiteSpace(inputEmail) || inputEmail.Length > 255)
-            return null;
+        private readonly string _connectionString;
 
-        // 2. Explicit column selection rather than SELECT *
-        const string sql = "SELECT status FROM registrations WHERE email = @Email;";
-
-        // 3. 'using' statements guarantee deterministic disposal and connection return to pool
-        using var conn = new SqlConnection(_connectionString);
-        using var cmd = new SqlCommand(sql, conn);
-
-        // 4. Parameterized query eliminates SQL injection completely
-        cmd.Parameters.Add(new SqlParameter("@Email", SqlDbType.NVarChar, 255)
+        public RegistrationService(string connectionString = null)
         {
-            Value = inputEmail.Trim()
-        });
+            _connectionString = connectionString ?? "Server=myServerAddress;Database=myDataBase;User Id=myUsername;Password=myPassword;TrustServerCertificate=True;";
+        }
 
-        conn.Open();
+        public bool ValidateStudentEmail(string email, string requiredDomain = "@univ.edu.ph")
+        {
+            if (string.IsNullOrWhiteSpace(email)) return false;
+            email = email.Trim().ToLowerInvariant();
+            var emailRegex = new Regex(@"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
+            return emailRegex.IsMatch(email) && email.EndsWith(requiredDomain.ToLowerInvariant());
+        }
 
-        // 5. Safe null handling prevents NullReferenceException
-        object? result = cmd.ExecuteScalar();
-        return result?.ToString();
+        public bool VerifySeatAvailability(int currentRegisteredCount, int maxCapacity)
+        {
+            if (maxCapacity <= 0) return false;
+            return currentRegisteredCount < maxCapacity;
+        }
+
+        public string GetUserRegistration(string inputEmail)
+        {
+            if (string.IsNullOrWhiteSpace(inputEmail))
+                throw new ArgumentException("Email input cannot be null or empty.", nameof(inputEmail));
+
+            const string query = "SELECT status FROM registrations WHERE email = @Email;";
+
+            // C# 'using' blocks guarantee deterministic resource disposal
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                using (var cmd = new SqlCommand(query, conn))
+                {
+                    // Parameterized query eliminates SQL Injection
+                    cmd.Parameters.Add(new SqlParameter("@Email", SqlDbType.NVarChar, 255)
+                    {
+                        Value = inputEmail.Trim().ToLowerInvariant()
+                    });
+
+                    conn.Open();
+                    var result = cmd.ExecuteScalar();
+                    return result != null ? result.ToString() : string.Empty;
+                }
+            }
+        }
     }
 }
 ```
@@ -743,10 +748,39 @@ Your diagnosis must:
 ##### 4. Applied Refactoring Summary
 * **Parameterization:** Replaced raw string concatenation with `SqlParameter("@Email", SqlDbType.NVarChar, 255)` to ensure the SQL database engine strictly treats inputs as literal data values.
 * **Deterministic Disposal:** Wrapped resources in C# `using` blocks (`IDisposable`), guaranteeing connection return to the connection pool even when runtime exceptions occur.
-* **Configuration Externalization:** Shifted connection strings to secure `IConfiguration` app settings.
-* **Safe Null-Coalescing:** Implemented null-safe operator `result?.ToString()` returning nullable `string?`.
+* **Safe Null-Coalescing:** Implemented null-safe operator `result?.ToString() ?? string.Empty`.
 
 ***
+
+---
+
+### 4. Unit Test Suite Execution & Mock Verification
+
+* **C# xUnit / Moq Suite:** [`tests/RegistrationServiceTests.cs`](./tests/RegistrationServiceTests.cs)
+* **Node.js Automated Test Runner:** [`tests/unit_tests.js`](./tests/unit_tests.js)
+
+#### Running Unit Tests:
+```bash
+npm test
+```
+
+#### Execution Output:
+```
+======================================================
+  🧪 Running Shift-Left Unit & Security Tests (Task 4)
+======================================================
+
+--- Test Suite 1: Institutional Email Domain Validation ---
+  ✅ 7/7 Email Validation Tests Passed
+
+--- Test Suite 2: Seat Availability & Capacity Bounds ---
+  ✅ 5/5 Capacity Verification Tests Passed
+
+--- Test Suite 3: Mock Object Dependency Isolation ---
+  ✅ 4/4 Mock Dependency Isolation Tests Passed
+
+🎉 All 16 Shift-Left Unit Tests successfully executed and passed!
+```
 
 ---
 
@@ -759,8 +793,8 @@ Your diagnosis must:
 
 | Member | Assigned Role | Core Responsibilities |
 | :--- | :--- | :--- |
-| **Member 1** (Ramos, Lenard) | **Systems Architect & Prompt Lead** | Task 1 (Requirements Analysis & Prompt Architecture) + Task 5 (Documentation & Integration) |
-| **Member 2** (Masangkay, Albert)| Task 2 (AI-Assisted UI & WCAG Accessibility) |
+| **Member 1** (Ramos, Lenard Kristan) | **Systems Architect & Prompt Lead** | Task 1 (Requirements Analysis & Prompt Architecture) + Task 5 (Documentation & Integration) |
+| **Member 2** (Masangkay, John Albert) | **Frontend Engineer** | Task 2 (AI-Assisted UI & WCAG Accessibility) |
 | **Member 3** (Umandal, Alen) | **Database & Backend Engineer** | Task 3 (3NF Schemas, Mermaid.js ERD & SQL Scripts) + Task 4 (Shift-Left Testing & Security) |
 | **Member 4** (Shared) | **QA & Security Engineer** | Task 4 (Shift-Left Unit Testing & Vulnerability Refactoring) |
 
@@ -790,9 +824,14 @@ Follow these steps to run and view the project files locally:
 4. **Launch Frontend Application:**
    ```bash
    npm install
-   npm run dev
+   npm start
    ```
    Open `http://localhost:3000` to view the Student Event Catalog and Admin Dashboard.
+
+5. **Run Shift-Left Unit Tests:**
+   ```bash
+   npm test
+   ```
 
 ---
 
@@ -815,14 +854,12 @@ The table below documents distinct instances across the project where our team i
 
 | Task # | Identified AI Flaw / Limitation | Manual Correction Applied | Member Responsible |
 | :--- | :--- | :--- | :--- |
-| **Task 1** | **Denormalized 1NF Entity Proposal:** AI generated a flat data model combining student profile attributes (`studentName`, `studentEmail`, `department`) directly into the `registrations` table and string values for event venues/categories. | Refactored architecture into a 7-entity 3NF relational model with isolated `users`, `departments`, `roles`, `venues`, and `event_categories` tables. | Member 1 & Member 3 |
-| **Task 2** | **Missing WCAG Accessibility Labels & Semantic Markup:** AI prototype used generic `<div>` wrappers and omitted `aria-label` attributes on form inputs, causing accessibility audit warnings. | Replaced `<div>` containers with semantic HTML5 tags (`<main>`, `<section>`, `<article>`) and added explicit `<label>` tags with `aria-label` attributes for screen readers. | Member 2 |
-| **Task 3** | **Missing Foreign Key Indexes in SQLite:** AI generated `FOREIGN KEY` constraints without corresponding non-clustered indexes, leading to sequential full table scans on joins. | Manually added 9 non-clustered index creation statements (`CREATE INDEX idx_*`) on all foreign key columns and query filters. | Member 3 |
-| **Task 3** | **Race-Condition & Capacity Overbooking Vulnerability:** AI relied solely on client-side state checks for capacity limits, allowing race conditions during concurrent bookings. | Implemented `BEFORE INSERT` and `BEFORE UPDATE` SQLite triggers enforcing capacity checks directly at the persistence layer. | Member 3 |
-| **Task 3** | **Event Capacity Exceeding Venue Physical Limits & Schedule Overlap:** AI did not validate event capacity against physical venue room size and permitted venue double-booking. | Added automated SQLite triggers verifying `events.capacity <= venues.capacity` and preventing overlapping date ranges for identical venues. | Member 3 |
-| **Task 4** | **SQL Injection & Unmanaged Database Connection Leak:** AI-provided starter code concatenated raw user input into SQL queries (`WHERE Email = '` + `inputEmail` + `'`) and failed to close/dispose `SqlConnection`. | Refactored method with parameterized `SqlCommand.Parameters.AddWithValue()` and wrapped `SqlConnection` and `SqlCommand` in C# `using` blocks. | Member 4 & Member 3 |
+| **Task 1** | Denormalized 1NF Entity Proposal: AI generated a flat data model combining student profile attributes (`studentName`, `studentEmail`, `department`) directly into the `registrations` table and string values for event venues/categories. | Refactored architecture into a 7-entity 3NF relational model with isolated `users`, `departments`, `roles`, `venues`, and `event_categories` tables. | Member 1 & Member 3 |
+| **Task 2** | Duplicate registrations are allowed for the same students and event | Check existing registrations by student ID or email before adding a new registration. | Member 2 |
+| **Task 2** | Missing WCAG Accessibility Labels & Semantic Markup: AI prototype used generic `<div>` wrappers and omitted `aria-label` attributes on form inputs, causing accessibility audit warnings. | Replaced `<div>` containers with semantic HTML5 tags (`<main>`, `<section>`, `<article>`) and added explicit `<label>` tags with `aria-label` attributes for screen readers. | Member 2 |
+| **Task 3** | Missing Foreign Key Indexes in SQLite: AI generated `FOREIGN KEY` constraints without corresponding non-clustered indexes, leading to sequential full table scans on joins. | Manually added 9 non-clustered index creation statements (`CREATE INDEX idx_*`) on all foreign key columns and query filters. | Member 3 |
+| **Task 3** | Race-Condition & Capacity Overbooking Vulnerability: AI relied solely on client-side state checks for capacity limits, allowing race conditions during concurrent bookings. | Implemented `BEFORE INSERT` and `BEFORE UPDATE` SQLite triggers enforcing capacity checks directly at the persistence layer. | Member 3 |
+| **Task 3** | Event Capacity Exceeding Venue Physical Limits & Schedule Overlap: AI did not validate event capacity against physical venue room size and permitted venue double-booking. | Added automated SQLite triggers verifying `events.capacity <= venues.capacity` and preventing overlapping date ranges for identical venues. | Member 3 |
+| **Task 4** | SQL Injection & Unmanaged Database Connection Leak: AI-provided starter code concatenated raw user input into SQL queries (`WHERE Email = '` + `inputEmail` + `'`) and failed to close/dispose `SqlConnection`. | Refactored method with parameterized `SqlCommand.Parameters.AddWithValue()` and wrapped `SqlConnection` and `SqlCommand` in C# `using` blocks. | Member 4 & Member 3 |
 
 ---
-
-
-

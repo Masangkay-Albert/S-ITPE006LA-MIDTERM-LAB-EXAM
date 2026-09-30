@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "test": "node tests/unit_tests.js",
     "db:seed": "node -e \"const { DatabaseSync } = require('node:sqlite'); const fs = require('fs'); const db = new DatabaseSync('database/dev.db'); db.exec(fs.readFileSync('database/schema.sql', 'utf8')); console.log('Database seeded successfully.');\"",
     "db:view": "node -e \"const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync('database/dev.db'); console.log('\\n=== 📊 DATABASE TABLES & RECORD COUNTS ==='); ['roles', 'departments', 'users', 'event_categories', 'venues', 'events', 'registrations'].forEach(t => console.log(t.padEnd(20) + ': ' + db.prepare('SELECT COUNT(*) as c FROM ' + t).get().c + ' records')); console.log('\\n=== 🎟️ LIVE EVENT CAPACITIES VIEW (v_event_capacities) ==='); console.table(db.prepare('SELECT * FROM v_event_capacities').all()); console.log('\\n=== 👥 REGISTERED ATTENDEES ROSTER ==='); console.table(db.prepare('SELECT r.id, e.title as event, u.student_id, u.first_name || \\' \\' || u.last_name as student, u.email, r.status FROM registrations r JOIN events e ON r.event_id = e.id JOIN users u ON r.user_id = u.id ORDER BY r.id ASC').all());\""
   },
