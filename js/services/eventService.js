@@ -15,6 +15,21 @@ export async function registerStudentForEvent(eventId, formValues) {
   }
 
   const currentRegistrations = targetEvent.registrations ?? [];
+  const studentId = formValues.studentId.trim();
+  const studentEmail = formValues.email.trim().toLowerCase();
+  const alreadyRegistered = currentRegistrations.some(
+    (registration) =>
+      registration.studentId === studentId ||
+      registration.studentEmail?.trim().toLowerCase() === studentEmail
+  );
+
+  if (alreadyRegistered) {
+    return {
+      success: false,
+      message: "You are already registered for this event."
+    };
+  }
+
   const remainingSeats = targetEvent.capacity - currentRegistrations.length;
 
   if (remainingSeats <= 0) {
@@ -25,9 +40,9 @@ export async function registerStudentForEvent(eventId, formValues) {
   }
 
   const registration = {
-    studentId: formValues.studentId.trim(),
+    studentId,
     studentName: formValues.studentName.trim(),
-    studentEmail: formValues.email.trim(),
+    studentEmail,
     department: formValues.department.trim(),
     course: formValues.course.trim()
   };
