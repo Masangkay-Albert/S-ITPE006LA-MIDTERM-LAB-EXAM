@@ -198,29 +198,93 @@ The AI-generated architecture is realistic and achievable for a 3-hour team prot
 
 ---
 
-## Task 3: 3NF Relational Database Architecture & DDL Implementation (30 Mins | 25 Points)
+## Task 3: 3NF Relational Database Architecture & DDL Implementation (45 Mins | 25 Points)
 **Lead:** Member 3 - (Umandal, Alen)
-
-### 1. 3NF Schema Design & Normalization Justification
-*Refer to full documentation in [`database/SCHEMA_DESIGN.md`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/database/SCHEMA_DESIGN.md) and Prisma schema in [`backend/prisma/schema.prisma`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/backend/prisma/schema.prisma).*
-
-#### Entities & Keys
-- **`roles`**: `id` (PK), `name` (UK)
-- **`departments`**: `id` (PK), `code` (UK), `name` (UK)
-- **`users`**: `id` (PK), `role_id` (FK), `department_id` (FK), `student_id` (UK), `email` (UK)
-- **`event_categories`**: `id` (PK), `name` (UK)
-- **`venues`**: `id` (PK), `name` (UK), `capacity` (CHECK > 0)
-- **`events`**: `id` (PK), `category_id` (FK), `venue_id` (FK), `organizer_id` (FK), `capacity` (CHECK > 0), `start_at`, `end_at` (CHECK `end_at > start_at`)
-- **`registrations`**: `id` (PK), `event_id` (FK), `user_id` (FK), `status` (CHECK), `UNIQUE(user_id, event_id)`
-
-#### Transitive Dependency Elimination
-- Redundant student profiles (name, email, department) live strictly in `users`, not duplicated in `registrations`.
-- Venue properties (building, venue capacity) and category metadata live in `venues` and `event_categories`, not duplicated in `events`.
-- Academic affiliations live in `departments`, referenced by `users.department_id`.
 
 ---
 
-### 2. Entity-Relationship Diagram (Mermaid.js)
+### 1. Database Engineer AI Prompt (RCTC Framework)
+
+The following prompt was engineered to generate a fully normalized 3NF relational schema, complete SQLite DDL, and integrity enforcement rules:
+
+```markdown
+[ROLE]
+You are a Senior Principal Database Architect and Data Engineer specializing in relational database normalization, high-concurrency ACID transactions, and robust indexing strategies.
+
+[CONTEXT]
+We are developing the persistence layer for an Online Campus Event Management System in SQLite / Prisma. The system manages student event registrations, administrative capacity limits, and venue logistics.
+
+[TASK]
+Design a production-grade 3rd Normal Form (3NF) relational database architecture and generate the complete SQL DDL script. Your output must include:
+1. Normalized Relational Schema: Break down entities to satisfy 1NF, 2NF, and 3NF across at least 3 relational entities (Users, Events, Registrations, Venues, Categories, Roles, Departments).
+2. Integrity Constraints & Foreign Keys: Explicit ON UPDATE / ON DELETE referential actions, CHECK constraints for values and date ordering, and format validations.
+3. Performance Indexing: Non-clustered indexes on all foreign key columns and frequently queried lookup fields.
+4. Concurrency & Business Logic Triggers: SQLite triggers preventing overbooking, venue physical capacity violations, organizer role constraints, and double-booked venue schedules.
+5. Visual ERD: An Entity-Relationship Diagram in Mermaid.js syntax.
+
+[CONSTRAINTS]
+- Eliminate all partial key and transitive dependencies to guarantee strict 3NF compliance.
+- Explicitly enforce SQLite foreign key pragma (`PRAGMA foreign_keys = ON;`).
+- Provide deterministic mock seed data with at least 3 events, 3 venues, 6 users, and active registrations.
+```
+
+---
+
+### 2. 3NF Schema Design & Normalization Breakdown
+
+*Detailed documentation: [`database/SCHEMA_DESIGN.md`](./database/SCHEMA_DESIGN.md) | Prisma Schema: [`backend/prisma/schema.prisma`](./backend/prisma/schema.prisma)*
+
+#### Normal Form Compliance:
+* **1NF (Atomic Attributes & Unique Rows):** All multivalued attributes are decomposed (e.g., student full names are separated into `first_name` and `last_name`; event dates separated into `start_at` and `end_at`). Each table has a unique primary key.
+* **2NF (No Partial Key Dependencies):** In associative tables like `registrations`, non-key attributes (`status`, `registered_at`, `updated_at`) depend on the full candidate key `(user_id, event_id)` and surrogate PK `id`.
+* **3NF (No Transitive Dependencies):** 
+  - User details (`student_id`, `email`, `department_id`) live strictly in `users`, not duplicated in `registrations`.
+  - Venue physical capacities and building locations live strictly in `venues`, preventing $\text{event\_id} \to \text{venue\_id} \to \text{building}$.
+  - Event categories live in `event_categories`, preventing $\text{event\_id} \to \text{category\_id} \to \text{category\_description}$.
+  - Roles and academic departments live in dedicated lookup tables (`roles`, `departments`).
+
+#### Relational Entities & Constraints Summary:
+
+| Entity | Primary Key | Foreign Keys | Key Constraints & Checks |
+| :--- | :--- | :--- | :--- |
+| **`roles`** | `id` | _None_ | `UNIQUE(name)`, `CHECK(name IN ('STUDENT', 'ADMIN'))` |
+| **`departments`** | `id` | _None_ | `UNIQUE(code)`, `UNIQUE(name)`, `CHECK(LENGTH(code) >= 2)` |
+| **`users`** | `id` | `role_id` $\to$ `roles(id)`<br>`department_id` $\to$ `departments(id)` | `UNIQUE(email)`, `UNIQUE(student_id)`, `CHECK(email LIKE '%_@_%._%')` |
+| **`event_categories`** | `id` | _None_ | `UNIQUE(name)` |
+| **`venues`** | `id` | _None_ | `UNIQUE(name)`, `CHECK(capacity > 0)` |
+| **`events`** | `id` | `category_id` $\to$ `event_categories(id)`<br>`venue_id` $\to$ `venues(id)`<br>`organizer_id` $\to$ `users(id)` | `CHECK(capacity > 0)`, `CHECK(end_at > start_at)` |
+| **`registrations`** | `id` | `event_id` $\to$ `events(id)`<br>`user_id` $\to$ `users(id)` | `UNIQUE(user_id, event_id)`, `CHECK(status IN ('CONFIRMED', 'CANCELLED', 'ATTENDED'))` |
+
+---
+
+### 3. Non-Clustered Indexes on Foreign Keys
+
+To optimize relational join performance and prevent table scans in SQLite:
+* `CREATE INDEX idx_users_role_id ON users (role_id);`
+* `CREATE INDEX idx_users_department_id ON users (department_id);`
+* `CREATE INDEX idx_events_category_id ON events (category_id);`
+* `CREATE INDEX idx_events_venue_id ON events (venue_id);`
+* `CREATE INDEX idx_events_organizer_id ON events (organizer_id);`
+* `CREATE INDEX idx_events_start_at ON events (start_at);`
+* `CREATE INDEX idx_registrations_event_id ON registrations (event_id);`
+* `CREATE INDEX idx_registrations_user_id ON registrations (user_id);`
+* `CREATE INDEX idx_registrations_status ON registrations (status);`
+
+---
+
+### 4. Database Integrity Triggers & Views
+
+The DDL includes 5 mission-critical database triggers and an analytical view:
+1. **Capacity Overbooking Protection (`trg_check_event_capacity_before_insert` / `trg_check_event_capacity_before_update`):** Aborts registration inserts/updates if confirmed attendee count equals or exceeds `events.capacity`.
+2. **Venue Safety Limit Enforcement (`trg_check_event_venue_capacity_before_insert` / `trg_check_event_venue_capacity_before_update`):** Enforces `events.capacity <= venues.capacity`.
+3. **Admin Organizer Validation (`trg_check_event_organizer_role_before_insert` / `trg_check_event_organizer_role_before_update`):** Verifies the organizer has an `ADMIN` role.
+4. **Venue Schedule Conflict Prevention (`trg_check_venue_schedule_conflict_before_insert` / `trg_check_venue_schedule_conflict_before_update`):** Prevents overlapping time ranges for the same venue.
+5. **Auto-Update Timestamps (`trg_users_updated_at`, `trg_events_updated_at`, `trg_registrations_updated_at`):** Automatically refreshes `updated_at` timestamps on row updates.
+6. **Analytical View (`v_event_capacities`):** Real-time calculation of registered attendees and remaining seats.
+
+---
+
+### 5. Entity-Relationship Diagram (Mermaid.js)
 
 ```mermaid
 erDiagram
@@ -298,6 +362,88 @@ erDiagram
 
 ---
 
-### 3. Production SQL DDL & Seed Script
-The executable SQL script is located at [`database/schema.sql`](file:///C:/Users/Alen/Documents/dev/work/S-ITPE006LA-MIDTERM-LAB-EXAM/database/schema.sql).
+### 6. Production SQL DDL & Seed Script
+The complete production SQL script is located at [`database/schema.sql`](./database/schema.sql).
+The database can be initialized or verified directly via:
+```bash
+node -e "const { DatabaseSync } = require('node:sqlite'); const fs = require('fs'); const db = new DatabaseSync('database/dev.db'); db.exec(fs.readFileSync('database/schema.sql', 'utf8')); console.log('Database initialized successfully.');"
+```
+
+---
+
+## Task 5: Group Integration & Verification Report (15 Mins | 10 Points)
+**Lead:** Member 1 (with input from all members)
+
+---
+
+### 1. Team Roster & Role Assignments
+
+| Member | Assigned Role | Core Responsibilities |
+| :--- | :--- | :--- |
+| **Member 1** (Ramos, Lenard) | **Systems Architect & Prompt Lead** | Task 1 (Requirements Analysis & Prompt Architecture) + Task 5 (Documentation & Integration) |
+| **Member 2** | **Frontend Engineer** | Task 2 (AI-Assisted UI & WCAG Accessibility) |
+| **Member 3** (Umandal, Alen) | **Database & Backend Engineer** | Task 3 (3NF Schemas, Mermaid.js ERD & SQL Scripts) + Task 4 (Shift-Left Testing & Security) |
+| **Member 4** (Shared) | **QA & Security Engineer** | Task 4 (Shift-Left Unit Testing & Vulnerability Refactoring) |
+
+---
+
+### 2. Setup Instructions
+
+Follow these steps to run and view the project files locally:
+
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/Masangkay-Albert/S-ITPE006LA-MIDTERM-LAB-EXAM.git
+   cd S-ITPE006LA-MIDTERM-LAB-EXAM
+   ```
+
+2. **Initialize SQLite Database & Apply DDL:**
+   Execute the production SQL script to generate `database/dev.db` with all tables, triggers, indexes, and seed records:
+   ```bash
+   node -e "const { DatabaseSync } = require('node:sqlite'); const fs = require('fs'); const db = new DatabaseSync('database/dev.db'); db.exec(fs.readFileSync('database/schema.sql', 'utf8')); console.log('Database seeded successfully.');"
+   ```
+
+3. **Verify Prisma Schema & Client:**
+   ```bash
+   npx prisma format --schema=backend/prisma/schema.prisma
+   ```
+
+4. **Launch Frontend Application:**
+   ```bash
+   npm install
+   npm run dev
+   ```
+   Open `http://localhost:3000` to view the Student Event Catalog and Admin Dashboard.
+
+---
+
+### 3. AI Disclosure Statement
+
+During this midterm laboratory examination, generative AI models (DeepMind Antigravity AI Assistant, Claude 3.7 Sonnet, and Gemini 2.5 Pro) were utilized to accelerate initial boilerplate generation, prompt architecture construction, UI wireframing, and DDL drafting. 
+
+**Verification & Quality Assurance Protocol:**
+Every AI-generated output underwent rigorous multi-stage manual verification and peer review:
+- **Architecture:** Assessed against realistic constraints for a 3-hour team prototype.
+- **Database & DDL:** Audited against Boyce-Codd / 3NF relational normalization rules, SQLite foreign key integrity (`PRAGMA foreign_keys = ON`), non-clustered indexing requirements, and ACID trigger safety.
+- **Frontend UI:** Verified for semantic HTML5 structure, ARIA labels, keyboard navigability, and WCAG 2.1 AA contrast standards.
+- **Backend & Security:** Audited for OWASP Top 10 vulnerabilities (specifically SQL injection) and .NET managed resource lifecycle (`using` statements).
+
+---
+
+### 4. Group Verification Log Table
+
+The table below documents distinct instances across the project where our team identified AI-generated flaws, limitations, or vulnerabilities and applied manual engineering corrections:
+
+| Task # | Identified AI Flaw / Limitation | Manual Correction Applied | Member Responsible |
+| :--- | :--- | :--- | :--- |
+| **Task 1** | **Denormalized 1NF Entity Proposal:** AI generated a flat data model combining student profile attributes (`studentName`, `studentEmail`, `department`) directly into the `registrations` table and string values for event venues/categories. | Refactored architecture into a 7-entity 3NF relational model with isolated `users`, `departments`, `roles`, `venues`, and `event_categories` tables. | Member 1 & Member 3 |
+| **Task 2** | **Missing WCAG Accessibility Labels & Semantic Markup:** AI prototype used generic `<div>` wrappers and omitted `aria-label` attributes on form inputs, causing accessibility audit warnings. | Replaced `<div>` containers with semantic HTML5 tags (`<main>`, `<section>`, `<article>`) and added explicit `<label>` tags with `aria-label` attributes for screen readers. | Member 2 |
+| **Task 3** | **Missing Foreign Key Indexes in SQLite:** AI generated `FOREIGN KEY` constraints without corresponding non-clustered indexes, leading to sequential full table scans on joins. | Manually added 9 non-clustered index creation statements (`CREATE INDEX idx_*`) on all foreign key columns and query filters. | Member 3 |
+| **Task 3** | **Race-Condition & Capacity Overbooking Vulnerability:** AI relied solely on client-side state checks for capacity limits, allowing race conditions during concurrent bookings. | Implemented `BEFORE INSERT` and `BEFORE UPDATE` SQLite triggers enforcing capacity checks directly at the persistence layer. | Member 3 |
+| **Task 3** | **Event Capacity Exceeding Venue Physical Limits & Schedule Overlap:** AI did not validate event capacity against physical venue room size and permitted venue double-booking. | Added automated SQLite triggers verifying `events.capacity <= venues.capacity` and preventing overlapping date ranges for identical venues. | Member 3 |
+| **Task 4** | **SQL Injection & Unmanaged Database Connection Leak:** AI-provided starter code concatenated raw user input into SQL queries (`WHERE Email = '` + `inputEmail` + `'`) and failed to close/dispose `SqlConnection`. | Refactored method with parameterized `SqlCommand.Parameters.AddWithValue()` and wrapped `SqlConnection` and `SqlCommand` in C# `using` blocks. | Member 4 & Member 3 |
+
+---
+
+
 

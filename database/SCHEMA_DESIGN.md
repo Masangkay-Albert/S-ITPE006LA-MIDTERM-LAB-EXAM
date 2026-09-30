@@ -145,6 +145,8 @@
 
 ---
 
+---
+
 ### Referential Integrity Action Matrix
 * `users.role_id -> roles.id`: `ON UPDATE CASCADE ON DELETE RESTRICT` (Prevents deletion of a role when users are assigned to it).
 * `users.department_id -> departments.id`: `ON UPDATE CASCADE ON DELETE SET NULL` (Allows department restructuring without deleting student accounts).
@@ -153,6 +155,38 @@
 * `events.organizer_id -> users.id`: `ON UPDATE CASCADE ON DELETE RESTRICT` (Preserves organizer audit trail for events).
 * `registrations.event_id -> events.id`: `ON UPDATE CASCADE ON DELETE CASCADE` (Prunes event registrations when an event is deleted).
 * `registrations.user_id -> users.id`: `ON UPDATE CASCADE ON DELETE CASCADE` (Prunes registrations when a student account is removed).
+
+---
+
+### Indexing Strategy (Non-Clustered Indexes on Foreign Keys & Query Hotspots)
+* `idx_users_role_id` on `users(role_id)`: Accelerates joins between `users` and `roles`.
+* `idx_users_department_id` on `users(department_id)`: Accelerates student department filtering.
+* `idx_events_category_id` on `events(category_id)`: Accelerates event category lookups and catalog filtering.
+* `idx_events_venue_id` on `events(venue_id)`: Accelerates venue scheduling conflict checks and joins.
+* `idx_events_organizer_id` on `events(organizer_id)`: Accelerates organizer profile lookups and audit queries.
+* `idx_events_start_at` on `events(start_at)`: Optimizes sorting and filtering for upcoming chronological events.
+* `idx_registrations_event_id` on `registrations(event_id)`: Crucial for attendee roster generation and capacity count aggregation.
+* `idx_registrations_user_id` on `registrations(user_id)`: Enables rapid retrieval of a student's enrolled events.
+* `idx_registrations_status` on `registrations(status)`: Speeds up active vs cancelled registration filters.
+
+---
+
+### Database Integrity Triggers
+1. **`trg_check_event_capacity_before_insert` / `trg_check_event_capacity_before_update`**:
+   - Ensures active event registrations (`status != 'CANCELLED'`) strictly never exceed `events.capacity`, preventing race conditions during concurrent bookings.
+2. **`trg_check_event_venue_capacity_before_insert` / `trg_check_event_venue_capacity_before_update`**:
+   - Validates that an event's target capacity does not exceed the physical room safety limit (`events.capacity <= venues.capacity`).
+3. **`trg_check_event_organizer_role_before_insert` / `trg_check_event_organizer_role_before_update`**:
+   - Verifies that the designated `organizer_id` holds an `ADMIN` role, preventing unauthorized users from creating events.
+4. **`trg_check_venue_schedule_conflict_before_insert` / `trg_check_venue_schedule_conflict_before_update`**:
+   - Enforces time-range conflict checks (`NEW.start_at < end_at AND NEW.end_at > start_at`) to guarantee no two events double-book the same venue.
+5. **`trg_users_updated_at` / `trg_events_updated_at` / `trg_registrations_updated_at`**:
+   - Automatically maintains accurate ISO 8601 timestamps on raw SQL row updates.
+
+---
+
+### Analytical Views
+* **`v_event_capacities`**: Computes real-time registration counts and remaining available seats per event (`capacity - registered_count`), filtering out cancelled registrations.
 
 ---
 
