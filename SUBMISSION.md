@@ -180,8 +180,7 @@ AppLayout (Navbar with Role Toggle: Student | Admin, Campus Logo)
 
 ##### 6. 3-Hour Team Implementation Breakdown
 
-| Timeline | Member 1 (Systems Architect) | Member 2 (Frontend Lead) | Member 3 (Backend & Integration Lead) |
-| :--- | :--- | :--- | :--- |
+| Timeline | 
 | **00:00 – 00:30** *(30m)* | Initialize Next.js project, Tailwind CSS, Prisma SQLite setup, define schemas, and write database seed script with 3 sample events. | Scaffold UI layout, navigation bar with mock role toggle, and design base responsive container. | Setup API Route skeleton (`/api/events`, `/api/registrations`), and configure database connection utility. |
 | **00:30 – 01:30** *(60m)* | Implement database queries, capacity validation helper, and duplicate registration protection logic. | Build `EventCard`, `EventGrid`, filter components, and mock modal for student registration. | Implement `/api/registrations` POST handler with input validation and `/api/admin/attendees` GET handler. |
 | **01:30 – 02:30** *(60m)* | Build Admin Dashboard view (`AttendeeRosterTable`, `CapacityMetricsBar`) and hook up to attendee API. | Connect `RegistrationModal` to POST API with loading states, error toast/alerts, and success confirmation. | Conduct end-to-end integration tests (student registration -> database update -> admin view instant reflection). |
@@ -371,6 +370,386 @@ node -e "const { DatabaseSync } = require('node:sqlite'); const fs = require('fs
 
 ---
 
+## Task 4: Shift-Left Testing, Security & Refactoring (45 Mins | 20 Points)
+**Lead:** Member 4 (QA & Security Engineer) / Shared between Members 1 & 3
+
+---
+
+### 1. Unit Test Generation with Mock Objects
+
+#### A. Unit Test Generation Prompt (RCTC Framework)
+
+```markdown
+[ROLE]
+You are a Lead QA Automation Engineer and Application Security Specialist specializing in shift-left test-driven development (TDD), mocking frameworks, and boundary value analysis.
+
+[CONTEXT]
+We are implementing the business logic for an Online Campus Event Management System. We need comprehensive unit tests for a core validation service (`RegistrationValidationService`) that handles:
+1. Institutional Email Validation: Ensuring student emails belong strictly to authorized university domains (`@univ.edu.ph` or `@dlsud.edu.ph`).
+2. Event Capacity & Seat Verification: Validating whether an event has open seats remaining by querying an `IEventRepository` data access interface.
+
+[TASK]
+Generate a robust, production-grade unit test suite that:
+1. Defines the `RegistrationValidationService` and its dependent `IEventRepository` interface.
+2. Implements isolated unit tests using Mock Objects to completely isolate external database dependencies.
+3. Tests comprehensive positive cases, boundary conditions, and negative edge cases (e.g., unauthorized public domains like gmail.com, malformed email strings, case insensitivity, events at exactly 100% capacity, overbooked events, and non-existent events).
+
+[CONSTRAINTS]
+- Do NOT make real network or database calls; all repository calls must be mocked.
+- Maintain AAA (Arrange-Act-Assert) pattern across all test methods.
+- Ensure 100% branch and path coverage across the validation routines.
+```
+
+#### B. Core Validation Routine Implementation
+
+```csharp
+// Interfaces & Domain Models
+public interface IEventRepository
+{
+    Task<EventCapacityDto?> GetEventCapacityAsync(int eventId);
+}
+
+public record EventCapacityDto(int EventId, int MaxCapacity, int ConfirmedRegistrations);
+
+public class RegistrationValidationService
+{
+    private readonly IEventRepository _eventRepository;
+    private static readonly string[] AllowedDomains = { "@univ.edu.ph", "@dlsud.edu.ph" };
+
+    public RegistrationValidationService(IEventRepository eventRepository)
+    {
+        _eventRepository = eventRepository ?? throw new ArgumentNullException(nameof(eventRepository));
+    }
+
+    /// <summary>
+    /// Validates that the provided email is well-formed and belongs to an authorized university domain.
+    /// </summary>
+    public bool IsValidUniversityEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return false;
+
+        email = email.Trim().ToLowerInvariant();
+
+        // Must contain single '@' and not start with '@'
+        int atIndex = email.IndexOf('@');
+        if (atIndex <= 0 || atIndex != email.LastIndexOf('@'))
+            return false;
+
+        return AllowedDomains.Any(domain => email.EndsWith(domain, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Checks if the specified event has open capacity for a new registration.
+    /// </summary>
+    public async Task<bool> IsSeatAvailableAsync(int eventId)
+    {
+        if (eventId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(eventId), "Event ID must be positive.");
+
+        var eventCapacity = await _eventRepository.GetEventCapacityAsync(eventId);
+        if (eventCapacity == null)
+            throw new KeyNotFoundException($"Event with ID {eventId} does not exist.");
+
+        return eventCapacity.ConfirmedRegistrations < eventCapacity.MaxCapacity;
+    }
+}
+```
+
+#### C. Unit Test Suite Using Mock Objects (xUnit + Moq)
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Moq;
+using Xunit;
+
+public class RegistrationValidationServiceTests
+{
+    private readonly Mock<IEventRepository> _mockRepo;
+    private readonly RegistrationValidationService _service;
+
+    public RegistrationValidationServiceTests()
+    {
+        _mockRepo = new Mock<IEventRepository>();
+        _service = new RegistrationValidationService(_mockRepo.Object);
+    }
+
+    #region Email Domain Validation Tests
+
+    [Theory]
+    [InlineData("student123@univ.edu.ph")]
+    [InlineData("faculty.lead@dlsud.edu.ph")]
+    [InlineData("JOHN.DOE@UNIV.EDU.PH")] // Case-insensitivity test
+    [InlineData("cs_dept@dlsud.edu.ph")]
+    public void IsValidUniversityEmail_WithValidUniversityDomain_ReturnsTrue(string validEmail)
+    {
+        // Act
+        bool result = _service.IsValidUniversityEmail(validEmail);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Theory]
+    [InlineData("student@gmail.com")]         // Unauthorized commercial domain
+    [InlineData("student@yahoo.com")]         // Unauthorized public email
+    [InlineData("student@univ.edu.ph.fake")]  // Domain spoofing suffix
+    [InlineData("@univ.edu.ph")]              // Missing local mailbox part
+    [InlineData("plainaddress")]              // Missing domain and '@'
+    [InlineData("user@@univ.edu.ph")]         // Duplicate '@' symbol
+    [InlineData("")]                          // Empty string
+    [InlineData("   ")]                       // Whitespace only
+    [InlineData(null)]                        // Null reference
+    public void IsValidUniversityEmail_WithInvalidOrUnauthorizedDomain_ReturnsFalse(string? invalidEmail)
+    {
+        // Act
+        bool result = _service.IsValidUniversityEmail(invalidEmail);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    #endregion
+
+    #region Seat Availability with Mock Objects
+
+    [Fact]
+    public async Task IsSeatAvailableAsync_WhenSeatsRemaining_ReturnsTrue()
+    {
+        // Arrange (Mock: 35 confirmed out of 50 max capacity)
+        int eventId = 101;
+        _mockRepo.Setup(r => r.GetEventCapacityAsync(eventId))
+                 .ReturnsAsync(new EventCapacityDto(eventId, MaxCapacity: 50, ConfirmedRegistrations: 35));
+
+        // Act
+        bool isAvailable = await _service.IsSeatAvailableAsync(eventId);
+
+        // Assert
+        Assert.True(isAvailable);
+        _mockRepo.Verify(r => r.GetEventCapacityAsync(eventId), Times.Once);
+    }
+
+    [Fact]
+    public async Task IsSeatAvailableAsync_WhenEventAtExactCapacity_ReturnsFalse()
+    {
+        // Arrange (Boundary test: 50 confirmed out of 50 max capacity)
+        int eventId = 102;
+        _mockRepo.Setup(r => r.GetEventCapacityAsync(eventId))
+                 .ReturnsAsync(new EventCapacityDto(eventId, MaxCapacity: 50, ConfirmedRegistrations: 50));
+
+        // Act
+        bool isAvailable = await _service.IsSeatAvailableAsync(eventId);
+
+        // Assert
+        Assert.False(isAvailable);
+        _mockRepo.Verify(r => r.GetEventCapacityAsync(eventId), Times.Once);
+    }
+
+    [Fact]
+    public async Task IsSeatAvailableAsync_WhenEventOverbooked_ReturnsFalse()
+    {
+        // Arrange (Edge test: 52 confirmed out of 50 capacity)
+        int eventId = 103;
+        _mockRepo.Setup(r => r.GetEventCapacityAsync(eventId))
+                 .ReturnsAsync(new EventCapacityDto(eventId, MaxCapacity: 50, ConfirmedRegistrations: 52));
+
+        // Act
+        bool isAvailable = await _service.IsSeatAvailableAsync(eventId);
+
+        // Assert
+        Assert.False(isAvailable);
+        _mockRepo.Verify(r => r.GetEventCapacityAsync(eventId), Times.Once);
+    }
+
+    [Fact]
+    public async Task IsSeatAvailableAsync_WhenEventDoesNotExist_ThrowsKeyNotFoundException()
+    {
+        // Arrange (Mock returns null for missing event)
+        int missingEventId = 999;
+        _mockRepo.Setup(r => r.GetEventCapacityAsync(missingEventId))
+                 .ReturnsAsync((EventCapacityDto?)null);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.IsSeatAvailableAsync(missingEventId));
+        _mockRepo.Verify(r => r.GetEventCapacityAsync(missingEventId), Times.Once);
+    }
+
+    [Fact]
+    public async Task IsSeatAvailableAsync_WithInvalidId_ThrowsArgumentOutOfRangeException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => _service.IsSeatAvailableAsync(-1));
+        
+        // Assert: External repository should never be touched on invalid parameter
+        _mockRepo.Verify(r => r.GetEventCapacityAsync(It.IsAny<int>()), Times.Never);
+    }
+
+    #endregion
+}
+```
+
+---
+
+### 2. Security & Vulnerability Challenge: Review and Refactoring
+
+#### A. Security Review of Flawed Backend Method
+
+**Original Flawed Code:**
+```csharp
+// Flawed code: Contains SQL Injection and unmanaged resource leak
+public string GetUserRegistration(string inputEmail)
+{
+    string connStr = "Server=myServerAddress;Database=myDataBase;User Id=myUsername;Password=myPassword;";
+    SqlConnection conn = new SqlConnection(connStr);
+    conn.Open(); // Connection is not closed or disposed
+    SqlCommand cmd = new SqlCommand("SELECT * FROM Registrations WHERE Email = '" + inputEmail + "'", conn);
+    return cmd.ExecuteScalar().ToString();
+}
+```
+
+**Identified Vulnerabilities & Code Smells:**
+
+1. **Critical Vulnerability — SQL Injection (CWE-89 / OWASP A03:2021-Injection):**
+   * **Mechanism:** The code directly concatenates unsanitized user input (`inputEmail`) into the SQL query text.
+   * **Exploit Vector:** An attacker entering `' OR '1'='1` or `' UNION SELECT password_hash FROM users --` can bypass filters, exfiltrate private attendee records, or execute destructive commands (e.g., `'; DROP TABLE Registrations; --`).
+2. **Resource & Memory Leak — Unmanaged Connection / Socket Leak (CWE-772 / CWE-404):**
+   * **Mechanism:** Neither `SqlConnection` nor `SqlCommand` is wrapped in a `using` statement or disposed via `try...finally`.
+   * **Consequence:** Each invocation leaves an open TCP socket and unmanaged ADO.NET connection handle active. Under production load or during repeated requests, this causes **Connection Pool Starvation** (`Timeout expired waiting for a connection from the pool`) and exhausts system memory, crashing the service.
+3. **Null Pointer Dereference (CWE-476):**
+   * **Mechanism:** `cmd.ExecuteScalar()` returns `null` if no record matches the given email.
+   * **Consequence:** Calling `.ToString()` directly on `null` triggers an unhandled `NullReferenceException`, producing an unhandled HTTP 500 error and potential Denial of Service (DoS).
+4. **Hardcoded Secrets in Source Code (CWE-798 / OWASP A07:2021):**
+   * **Mechanism:** Database host, username, and password credentials are committed in plain text within application code.
+   * **Consequence:** Any developer or unauthorized party with repository read access gains full compromise of the database server.
+5. **Inefficient Query Pattern:**
+   * **Mechanism:** `SELECT *` retrieves all columns over the network, but `ExecuteScalar()` discards everything except the first column of the first row.
+
+---
+
+#### B. Refactored Secure Implementation
+
+```csharp
+using System;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+
+public class RegistrationRepository
+{
+    private readonly string _connectionString;
+
+    // Inject configuration to avoid hardcoded credentials
+    public RegistrationRepository(IConfiguration configuration)
+    {
+        _connectionString = configuration.GetConnectionString("DefaultConnection") 
+            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not configured.");
+    }
+
+    /// <summary>
+    /// Safely retrieves registration status by email using parameterized queries
+    /// and deterministic unmanaged resource disposal.
+    /// </summary>
+    /// <param name="inputEmail">Student institutional email address.</param>
+    /// <returns>Registration status or null if not found.</returns>
+    public string? GetUserRegistration(string? inputEmail)
+    {
+        // 1. Guard clause: Reject null, empty, or oversized input
+        if (string.IsNullOrWhiteSpace(inputEmail) || inputEmail.Length > 255)
+            return null;
+
+        // 2. Explicit column selection rather than SELECT *
+        const string sql = "SELECT status FROM registrations WHERE email = @Email;";
+
+        // 3. 'using' statements guarantee deterministic disposal and connection return to pool
+        using var conn = new SqlConnection(_connectionString);
+        using var cmd = new SqlCommand(sql, conn);
+
+        // 4. Parameterized query eliminates SQL injection completely
+        cmd.Parameters.Add(new SqlParameter("@Email", SqlDbType.NVarChar, 255)
+        {
+            Value = inputEmail.Trim()
+        });
+
+        conn.Open();
+
+        // 5. Safe null handling prevents NullReferenceException
+        object? result = cmd.ExecuteScalar();
+        return result?.ToString();
+    }
+}
+```
+
+---
+
+### 3. AI Security Diagnosis Prompt & Output
+
+#### A. AI Diagnostic Prompt
+
+```markdown
+[ROLE]
+You are a Principal Application Security Auditor and Static Analysis Expert specializing in OWASP Top 10 vulnerabilities, secure coding practices, and .NET runtime performance.
+
+[TASK]
+Conduct an in-depth security and reliability audit of the following C# method:
+
+```csharp
+public string GetUserRegistration(string inputEmail)
+{
+    string connStr = "Server=myServerAddress;Database=myDataBase;User Id=myUsername;Password=myPassword;";
+    SqlConnection conn = new SqlConnection(connStr);
+    conn.Open();
+    SqlCommand cmd = new SqlCommand("SELECT * FROM Registrations WHERE Email = '" + inputEmail + "'", conn);
+    return cmd.ExecuteScalar().ToString();
+}
+```
+
+Your diagnosis must:
+1. Identify all critical security vulnerabilities (CWE numbers, severity, and exploitation vectors).
+2. Detail memory and resource management risks, specifically explaining connection pooling starvation.
+3. Highlight edge-case failure modes and exceptions.
+4. Provide a refactored, production-ready solution adhering to secure software development standards.
+```
+
+#### B. AI Tool Diagnostic Output
+
+***
+
+##### Static Code Analysis & Security Diagnosis Report
+
+| Issue | Vulnerability Classification | Severity | Impact |
+| :--- | :--- | :--- | :--- |
+| **SQL Injection** | CWE-89 (OWASP A03:2021) | **CRITICAL (CVSS 9.8)** | Remote database compromise, authentication bypass, data exfiltration. |
+| **Unmanaged Resource Leak** | CWE-772 / CWE-404 | **HIGH (CVSS 7.5)** | Connection pool exhaustion, socket depletion, process denial-of-service. |
+| **Null Reference Dereference** | CWE-476 | **MEDIUM (CVSS 5.3)** | Unhandled 500 crash whenever email is absent or unconfirmed. |
+| **Hardcoded Credentials** | CWE-798 (OWASP A07:2021) | **HIGH (CVSS 7.4)** | Plaintext credential exposure in source code and binaries. |
+
+##### 1. SQL Injection Vulnerability Analysis (CWE-89)
+* **Root Cause:** Direct string concatenation (`"WHERE Email = '" + inputEmail + "'"`) allows attacker input to break out of data context and alter SQL command semantics.
+* **Exploit Vector Example:**
+  * Setting `inputEmail = "admin@univ.edu.ph' --"` comments out any remaining query criteria.
+  * Setting `inputEmail = "' UNION SELECT password_hash FROM users --"` exfiltrates sensitive database tables.
+  * Setting `inputEmail = "'; DROP TABLE Registrations; --"` executes second-order destructive DDL operations.
+
+##### 2. Resource Leak & Connection Pool Starvation (CWE-772)
+* **Root Cause:** `SqlConnection` and `SqlCommand` wrap unmanaged OS socket handles and native TDS connections.
+* **Failure Mechanism:** In ADO.NET, calling `conn.Open()` claims a physical connection from the connection pool. Because `conn.Close()` and `conn.Dispose()` are never invoked, the connection is never released back to the pool.
+* **Runtime Result:** The .NET Garbage Collector does not immediately clean up unreferenced `SqlConnection` instances. After 100 requests (the default ADO.NET pool size limit), all pool connections remain in a leaked state. Subsequent requests block for 15 seconds before failing with `System.InvalidOperationException: Timeout expired. The timeout period elapsed prior to obtaining a connection from the pool`.
+
+##### 3. Null Pointer Dereference (CWE-476)
+* When an unregistered or non-existent email is queried, `cmd.ExecuteScalar()` yields `null`. Directly calling `.ToString()` on a null reference throws `System.NullReferenceException`, crashing the request pipeline.
+
+##### 4. Applied Refactoring Summary
+* **Parameterization:** Replaced raw string concatenation with `SqlParameter("@Email", SqlDbType.NVarChar, 255)` to ensure the SQL database engine strictly treats inputs as literal data values.
+* **Deterministic Disposal:** Wrapped resources in C# `using` blocks (`IDisposable`), guaranteeing connection return to the connection pool even when runtime exceptions occur.
+* **Configuration Externalization:** Shifted connection strings to secure `IConfiguration` app settings.
+* **Safe Null-Coalescing:** Implemented null-safe operator `result?.ToString()` returning nullable `string?`.
+
+***
+
+---
+
 ## Task 5: Group Integration & Verification Report (15 Mins | 10 Points)
 **Lead:** Member 1 (with input from all members)
 
@@ -381,7 +760,7 @@ node -e "const { DatabaseSync } = require('node:sqlite'); const fs = require('fs
 | Member | Assigned Role | Core Responsibilities |
 | :--- | :--- | :--- |
 | **Member 1** (Ramos, Lenard) | **Systems Architect & Prompt Lead** | Task 1 (Requirements Analysis & Prompt Architecture) + Task 5 (Documentation & Integration) |
-| **Member 2** | **Frontend Engineer** | Task 2 (AI-Assisted UI & WCAG Accessibility) |
+| **Member 2** (Masangkay, Albert)| Task 2 (AI-Assisted UI & WCAG Accessibility) |
 | **Member 3** (Umandal, Alen) | **Database & Backend Engineer** | Task 3 (3NF Schemas, Mermaid.js ERD & SQL Scripts) + Task 4 (Shift-Left Testing & Security) |
 | **Member 4** (Shared) | **QA & Security Engineer** | Task 4 (Shift-Left Unit Testing & Vulnerability Refactoring) |
 
