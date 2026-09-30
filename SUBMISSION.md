@@ -771,15 +771,24 @@ npm test
 ======================================================
 
 --- Test Suite 1: Institutional Email Domain Validation ---
-  ✅ 7/7 Email Validation Tests Passed
+  ✅ 9/9 Email Validation Tests Passed
 
---- Test Suite 2: Seat Availability & Capacity Bounds ---
+--- Test Suite 2: Student ID Format & Academic Year Bounds ---
+  ✅ 9/9 Student ID Validation Tests Passed
+
+--- Test Suite 3: Student Full Name & Character Validation ---
+  ✅ 8/8 Student Name Validation Tests Passed
+
+--- Test Suite 4: Complete Registration Payload Validation ---
+  ✅ 7/7 Form Payload Validation Tests Passed
+
+--- Test Suite 5: Seat Availability & Capacity Bounds ---
   ✅ 5/5 Capacity Verification Tests Passed
 
---- Test Suite 3: Mock Object Dependency Isolation ---
+--- Test Suite 6: Mock Object Dependency Isolation ---
   ✅ 4/4 Mock Dependency Isolation Tests Passed
 
-🎉 All 16 Shift-Left Unit Tests successfully executed and passed!
+🎉 All 42 Shift-Left Unit & Validation Tests successfully executed and passed!
 ```
 
 ---

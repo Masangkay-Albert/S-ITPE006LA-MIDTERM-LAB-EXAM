@@ -198,31 +198,150 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+const ALLOWED_EMAIL_DOMAINS = [
+  '@univ.edu.ph',
+  '@dlsud.edu.ph',
+  '@campus.edu',
+  '@cityu.edu',
+  '@edu.ph'
+];
+
+function sanitizeString(str) {
+  if (typeof str !== 'string') return '';
+  return str.replace(/<[^>]*>?/gm, '').trim();
+}
+
+function validateRegistrationPayload(body) {
+  const errors = {};
+  const studentName = sanitizeString(body.studentName);
+  const studentId = sanitizeString(body.studentId);
+  const email = sanitizeString(body.email).toLowerCase();
+  const department = sanitizeString(body.department);
+  const course = sanitizeString(body.course);
+  const eventIdRaw = body.eventId;
+
+  // 1. Student Name Validation
+  if (!studentName) {
+    errors.studentName = 'Full name is required.';
+  } else if (studentName.length < 2) {
+    errors.studentName = 'Full name must be at least 2 characters.';
+  } else if (studentName.length > 100) {
+    errors.studentName = 'Full name cannot exceed 100 characters.';
+  } else if (!/^[a-zA-ZÀ-ÿ\s'.\-]+$/.test(studentName)) {
+    errors.studentName = 'Name can only contain letters, spaces, hyphens, and apostrophes.';
+  }
+
+  // 2. Student ID Validation
+  if (!studentId) {
+    errors.studentId = 'Student ID is required.';
+  } else {
+    const idPattern = /^(20[1-3][0-9])-(\d{5})$/;
+    const match = studentId.match(idPattern);
+    if (!match) {
+      errors.studentId = 'Student ID must follow format YYYY-XXXXX (e.g. 2024-10081).';
+    } else {
+      const year = parseInt(match[1], 10);
+      if (year < 2015 || year > 2030) {
+        errors.studentId = 'Student ID academic year must be between 2015 and 2030.';
+      }
+    }
+  }
+
+  // 3. Email Validation
+  if (!email) {
+    errors.email = 'Campus email address is required.';
+  } else {
+    const rfcRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!rfcRegex.test(email)) {
+      errors.email = 'Please provide a valid email address format.';
+    } else {
+      const hasValidDomain = ALLOWED_EMAIL_DOMAINS.some((domain) => email.endsWith(domain));
+      if (!hasValidDomain) {
+        errors.email = 'Must use an authorized campus email (e.g. @univ.edu.ph, @cityu.edu, @campus.edu).';
+      }
+    }
+  }
+
+  // 4. Department Validation
+  if (!department) {
+    errors.department = 'Department / College is required.';
+  } else if (department.length < 2) {
+    errors.department = 'Department must be at least 2 characters.';
+  } else if (department.length > 100) {
+    errors.department = 'Department cannot exceed 100 characters.';
+  }
+
+  // 5. Course Validation
+  if (!course) {
+    errors.course = 'Degree program and year level is required.';
+  } else if (course.length < 2) {
+    errors.course = 'Degree program must be at least 2 characters.';
+  } else if (course.length > 100) {
+    errors.course = 'Degree program cannot exceed 100 characters.';
+  }
+
+  // 6. Event ID Validation
+  if (!eventIdRaw && eventIdRaw !== 0) {
+    errors.eventId = 'Event ID is required.';
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+    sanitized: {
+      studentName,
+      studentId,
+      email,
+      department,
+      course,
+      eventId: eventIdRaw
+    }
+  };
+}
+
   // 3. POST /api/registrations
   if (method === 'POST' && pathname === '/api/registrations') {
     try {
       const body = await parseBody(req);
-      const studentId = (body.studentId || '').trim();
-      const studentName = (body.studentName || '').trim();
-      const email = (body.email || '').trim().toLowerCase();
-      const departmentName = (body.department || '').trim();
-      const course = (body.course || '').trim();
-      const eventIdRaw = body.eventId;
+      const validation = validateRegistrationPayload(body);
 
-      if (!studentId || !studentName || !email || !eventIdRaw) {
+      if (!validation.isValid) {
         sendJson(res, 400, {
           success: false,
-          message: 'All fields (studentId, studentName, email, eventId) are required.'
+          message: 'Validation failed. Please correct the highlighted errors.',
+          errors: validation.errors
         });
         return;
       }
 
+      const { studentId, studentName, email, department: departmentName, course, eventId: eventIdRaw } = validation.sanitized;
+
       // Locate target event
-      const event = db.prepare('SELECT id, title, capacity FROM events WHERE id = ? OR slug = ?').get(eventIdRaw, String(eventIdRaw));
+      const event = db.prepare('SELECT id, title, capacity, start_at FROM events WHERE id = ? OR slug = ?').get(eventIdRaw, String(eventIdRaw));
       if (!event) {
         sendJson(res, 404, {
           success: false,
           message: 'Selected event could not be found.'
+        });
+        return;
+      }
+
+      // Check if event is in the past
+      const eventDate = new Date(event.start_at);
+      if (!isNaN(eventDate.getTime()) && eventDate.getTime() < Date.now() - 86400000) {
+        sendJson(res, 400, {
+          success: false,
+          message: 'Registration is closed because this event has already taken place.'
+        });
+        return;
+      }
+
+      // Check current capacity
+      const regCountRow = db.prepare('SELECT COUNT(*) AS count FROM registrations WHERE event_id = ? AND status != "CANCELLED"').get(event.id);
+      if (regCountRow && regCountRow.count >= event.capacity) {
+        sendJson(res, 409, {
+          success: false,
+          message: 'This event is already at full capacity. Please choose another event.'
         });
         return;
       }
@@ -253,6 +372,16 @@ const server = http.createServer(async (req, res) => {
         `);
         const userRes = insUser.run(dept.id, studentId, firstName, lastName, email);
         user = { id: Number(userRes.lastInsertRowid), student_id: studentId, email };
+      }
+
+      // Check if user is already registered for this event
+      const existingReg = db.prepare('SELECT id, status FROM registrations WHERE event_id = ? AND user_id = ?').get(event.id, user.id);
+      if (existingReg && existingReg.status !== 'CANCELLED') {
+        sendJson(res, 409, {
+          success: false,
+          message: 'You are already registered for this event.'
+        });
+        return;
       }
 
       // Attempt registration (Enforces SQLite triggers and UNIQUE constraints)

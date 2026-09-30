@@ -53,7 +53,8 @@ export async function registerStudentForEvent(eventId, formValues) {
     if (result && result.message) {
       return {
         success: false,
-        message: result.message
+        message: result.message,
+        errors: result.errors || null
       };
     }
   } catch (err) {

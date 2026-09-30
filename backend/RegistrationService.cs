@@ -8,6 +8,8 @@ namespace CampusEventManagement.Backend
     public interface IRegistrationService
     {
         bool ValidateStudentEmail(string email, string requiredDomain = "@univ.edu.ph");
+        bool ValidateStudentId(string studentId);
+        bool ValidateStudentName(string name);
         bool VerifySeatAvailability(int currentRegisteredCount, int maxCapacity);
         string GetUserRegistration(string inputEmail);
     }
@@ -38,6 +40,41 @@ namespace CampusEventManagement.Backend
 
             // Domain validation (e.g. @univ.edu.ph or @campus.edu)
             return email.EndsWith(requiredDomain.ToLowerInvariant());
+        }
+
+        /// <summary>
+        /// Validates student ID format (YYYY-XXXXX) and academic year bounds (2015-2030).
+        /// </summary>
+        public bool ValidateStudentId(string studentId)
+        {
+            if (string.IsNullOrWhiteSpace(studentId))
+                return false;
+
+            var match = Regex.Match(studentId.Trim(), @"^(20[1-3][0-9])-(\d{5})$");
+            if (!match.Success)
+                return false;
+
+            if (int.TryParse(match.Groups[1].Value, out int year))
+            {
+                return year >= 2015 && year <= 2030;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Validates student full name character constraints and length.
+        /// </summary>
+        public bool ValidateStudentName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return false;
+
+            var trimmed = name.Trim();
+            if (trimmed.Length < 2 || trimmed.Length > 100)
+                return false;
+
+            return Regex.IsMatch(trimmed, @"^[a-zA-Z\s'.\-]+$");
         }
 
         /// <summary>

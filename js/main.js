@@ -8,7 +8,7 @@ import { getEvents, registerStudentForEvent } from "./services/eventService.js";
 import { appState, resetFilters, setEvents, setFilteredEvents, setSelectedEventId, updateFilters } from "./state/appState.js";
 import { trapFocus } from "./utils/accessibility.js";
 import { formatSeatSummary } from "./utils/formatting.js";
-import { validateRegistrationForm } from "./utils/validation.js";
+import { validateRegistrationForm, validateField } from "./utils/validation.js";
 
 const filtersContainer = document.querySelector("#filtersContainer");
 const eventGrid = document.querySelector("#eventGrid");
@@ -114,6 +114,28 @@ function handleRegistrationStart(eventId) {
 
   cancelButton?.addEventListener("click", closeModal);
 
+  // Attach real-time on-blur and on-input validation handlers
+  const inputs = form?.querySelectorAll("input");
+  inputs?.forEach((input) => {
+    const fieldName = input.name;
+    const errorNode = form.querySelector(`#${fieldName}Error`);
+
+    const runFieldValidation = () => {
+      const errorMsg = validateField(fieldName, input.value);
+      input.setAttribute("aria-invalid", errorMsg ? "true" : "false");
+      if (errorNode) {
+        errorNode.textContent = errorMsg || "";
+      }
+    };
+
+    input.addEventListener("blur", runFieldValidation);
+    input.addEventListener("input", () => {
+      if (input.getAttribute("aria-invalid") === "true") {
+        runFieldValidation();
+      }
+    });
+  });
+
   form?.addEventListener("submit", async (submitEvent) => {
     submitEvent.preventDefault();
 
@@ -135,7 +157,16 @@ function handleRegistrationStart(eventId) {
     });
 
     if (!validationResult.isValid) {
+      // Focus the first invalid input for accessibility
+      const firstInvalid = form.querySelector('[aria-invalid="true"]');
+      firstInvalid?.focus();
       return;
+    }
+
+    const submitBtn = form.querySelector("#submitRegistrationBtn");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Reserving seat...";
     }
 
     const result = await registerStudentForEvent(event.id, values);

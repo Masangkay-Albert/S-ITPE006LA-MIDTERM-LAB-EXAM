@@ -36,6 +36,46 @@ namespace CampusEventManagement.Tests
 
         #endregion
 
+        #region Student ID & Name Validation Unit Tests
+
+        [Theory]
+        [InlineData("2024-10081", true)]
+        [InlineData("2015-00001", true)]
+        [InlineData("2030-99999", true)]
+        [InlineData("2014-12345", false)]
+        [InlineData("2031-12345", false)]
+        [InlineData("2024-1234", false)]
+        [InlineData("INVALID-ID", false)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void ValidateStudentId_ShouldEnforceFormatAndYearBounds(string studentId, bool expectedResult)
+        {
+            // Act
+            bool result = _service.ValidateStudentId(studentId);
+
+            // Assert
+            Assert.Equal(expectedResult, result);
+        }
+
+        [Theory]
+        [InlineData("Alicia Santos", true)]
+        [InlineData("Mary-Jane O'Connor", true)]
+        [InlineData("A", false)]
+        [InlineData("John Doe 123", false)]
+        [InlineData("<script>", false)]
+        [InlineData("", false)]
+        [InlineData(null, false)]
+        public void ValidateStudentName_ShouldEnforceAlphabeticAndLengthBounds(string name, bool expectedResult)
+        {
+            // Act
+            bool result = _service.ValidateStudentName(name);
+
+            // Assert
+            Assert.Equal(expectedResult, result);
+        }
+
+        #endregion
+
         #region Seat Availability Unit Tests
 
         [Theory]
